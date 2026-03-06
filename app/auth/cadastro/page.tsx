@@ -143,29 +143,7 @@ function SignUpForm() {
 
   async function handleGoogleSignIn() {
     setLoading(true)
-    const supabase = createClient()
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    })
-
-    if (error) {
-      console.error('OAuth Error:', error)
-      toast.error("Erro ao conectar com Google", {
-        description: error.message === "Unsupported provider: provider is not enabled"
-          ? "O login com Google ainda não está configurado. Use email e senha."
-          : error.message,
-      })
-      setLoading(false)
-      return
-    }
+    window.location.href = `/auth/google/start?flow=signup&role=${role}`
   }
 
   return (

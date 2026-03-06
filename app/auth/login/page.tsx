@@ -4,11 +4,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Scale, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,29 +18,7 @@ export default function LoginPage() {
 
   async function handleGoogleSignIn() {
     setLoading(true)
-    const supabase = createClient()
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    })
-
-    if (error) {
-      console.error('OAuth Error:', error)
-      toast.error("Erro ao conectar com Google", {
-        description: error.message === "Unsupported provider: provider is not enabled"
-          ? "O login com Google ainda não está configurado. Use email e senha."
-          : error.message,
-      })
-      setLoading(false)
-      return
-    }
+    window.location.href = "/auth/google/start?flow=login"
   }
 
   async function handleLogin(e: React.FormEvent) {
