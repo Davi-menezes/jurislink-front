@@ -39,7 +39,7 @@ export default async function LawyerDashboard() {
     .single()
 
   if (!lawyerProfile) {
-    redirect("/painel/advogado/completar-perfil")
+    redirect("/painel/advogado/perfil")
   }
 
   // Buscar leads/contatos
