@@ -81,23 +81,27 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code || !state || !stateCookie || stateCookie !== state.nonce) {
+    console.warn("[google/callback] state inválido ou ausente")
     return cleanupRedirect()
   }
 
   const redirectUri = `${origin}/auth/google/callback`
   const tokenData = await exchangeGoogleCode(code, redirectUri)
   if (!tokenData.access_token) {
+    console.warn("[google/callback] falha ao trocar code por access_token", tokenData.error)
     return cleanupRedirect()
   }
 
   const userInfo = await getGoogleUserInfo(tokenData.access_token)
   if (!userInfo.email || !userInfo.email_verified) {
+    console.warn("[google/callback] email ausente ou não verificado no Google")
     return cleanupRedirect()
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceRoleKey) {
+    console.warn("[google/callback] envs do Supabase admin ausentes")
     return cleanupRedirect()
   }
 
@@ -115,6 +119,7 @@ export async function GET(request: NextRequest) {
 
   // Ignora conflito caso o usuário já exista no Auth.
   if (createError && !createError.message.toLowerCase().includes("already")) {
+    console.warn("[google/callback] erro ao criar usuário no Supabase:", createError.message)
     return cleanupRedirect()
   }
 
@@ -127,9 +132,21 @@ export async function GET(request: NextRequest) {
   })
 
   if (magicLinkError || !magicLinkData.properties?.action_link) {
+    console.warn("[google/callback] erro ao gerar magic link:", magicLinkError?.message)
     return cleanupRedirect()
   }
 
+  const tokenHash = magicLinkData.properties.hashed_token
+  if (tokenHash) {
+    const localCallback = new URL(`${origin}/auth/callback`)
+    localCallback.searchParams.set("token_hash", tokenHash)
+    localCallback.searchParams.set("type", "magiclink")
+    const response = NextResponse.redirect(localCallback.toString())
+    response.cookies.delete("google_oauth_state")
+    return response
+  }
+
+  // Fallback para o action_link padrão do Supabase caso hashed_token não esteja disponível.
   const response = NextResponse.redirect(magicLinkData.properties.action_link)
   response.cookies.delete("google_oauth_state")
   return response

@@ -31,6 +31,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth/error`)
     }
   } else {
+    console.warn("Callback sem code e sem token_hash/type")
     return NextResponse.redirect(`${origin}/auth/error`)
   }
 
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
+    console.warn("Callback sem usuário após autenticação:", userError?.message)
     return NextResponse.redirect(`${origin}/auth/error`)
   }
 
