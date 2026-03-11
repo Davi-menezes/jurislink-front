@@ -1,9 +1,8 @@
 import { MetadataRoute } from 'next'
-import { createClient } from '@/lib/supabase/server'
+import { buildApiUrl } from '@/lib/api'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jurislink.com.br'
-  const supabase = await createClient()
 
   // Páginas estáticas
   const staticPages: MetadataRoute.Sitemap = [
@@ -39,11 +38,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
 
-  // Buscar áreas jurídicas
-  const { data: areas } = await supabase
-    .from('legal_areas')
-    .select('slug, updated_at')
-    .eq('is_active', true)
+  const response = await fetch(buildApiUrl("/api/public/sitemap"), { cache: "no-store" })
+  const payload = response.ok ? await response.json() : null
+  const areas = Array.isArray(payload?.areas) ? payload.areas : []
+  const lawyers = Array.isArray(payload?.lawyers) ? payload.lawyers : []
 
   const areaPages: MetadataRoute.Sitemap = areas?.map((area) => ({
     url: `${baseUrl}/buscar?area=${area.slug}`,
@@ -51,14 +49,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'weekly' as const,
     priority: 0.8,
   })) || []
-
-  // Buscar perfis de advogados aprovados
-  const { data: lawyers } = await supabase
-    .from('lawyer_profiles')
-    .select('slug, updated_at')
-    .eq('is_approved', true)
-    .not('slug', 'is', null)
-    .limit(5000) // Limite para não sobrecarregar
 
   const lawyerPages: MetadataRoute.Sitemap = lawyers?.map((lawyer) => ({
     url: `${baseUrl}/advogado/${lawyer.slug}`,

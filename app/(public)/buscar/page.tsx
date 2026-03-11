@@ -1,7 +1,7 @@
 import { Suspense } from "react"
-import { createClient } from "@/lib/supabase/server"
 import type { Metadata } from "next"
 import { SearchResults } from "./search-results"
+import { buildApiUrl } from "@/lib/api"
 
 export const metadata: Metadata = {
   title: "Buscar Advogados",
@@ -9,12 +9,9 @@ export const metadata: Metadata = {
 }
 
 export default async function SearchPage() {
-  const supabase = await createClient()
-  const { data: areas } = await supabase
-    .from("legal_areas")
-    .select("*")
-    .eq("is_active", true)
-    .order("name")
+  const response = await fetch(buildApiUrl("/api/public/legal-areas"), { cache: "no-store" })
+  const payload = response.ok ? await response.json() : null
+  const areas = Array.isArray(payload?.areas) ? payload.areas : []
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser, getDashboardData } from "@/lib/auth/server"
 import { Metadata } from "next"
+import { buildApiUrl } from "@/lib/api"
 import { 
   MapPin, 
   Briefcase, 
@@ -29,59 +29,17 @@ interface LawyerPageProps {
 }
 
 async function getLawyerBySlug(slug: string) {
-  const supabase = await createClient()
-  
-  const { data: lawyer } = await supabase
-    .from("lawyer_profiles")
-    .select(`
-      *,
-      profiles:user_id (
-        id,
-        full_name,
-        avatar_url,
-        state,
-        city,
-        phone
-      ),
-      lawyer_legal_areas(
-        legal_areas(
-          id,
-          name,
-          slug,
-          icon
-        )
-      )
-    `)
-    .eq("slug", slug)
-    .eq("is_approved", true)
-    .single()
-
-  if (!lawyer) {
+  const response = await fetch(buildApiUrl(`/api/public/lawyers/${slug}`), { cache: "no-store" })
+  if (!response.ok) {
     return null
   }
 
-  // Incrementar visualizações
-  await supabase
-    .from("lawyer_profiles")
-    .update({ total_views: (lawyer.total_views || 0) + 1 })
-    .eq("id", lawyer.id)
+  const payload = await response.json().catch(() => null)
+  if (!payload?.lawyer) {
+    return null
+  }
 
-  // Buscar avaliações
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select(`
-      *,
-      profiles:client_id (
-        id,
-        full_name,
-        avatar_url
-      )
-    `)
-    .eq("lawyer_id", lawyer.id)
-    .eq("is_hidden", false)
-    .order("created_at", { ascending: false })
-
-  return { lawyer, reviews }
+  return { lawyer: payload.lawyer, reviews: payload.reviews || [] }
 }
 
 export async function generateMetadata({ params }: LawyerPageProps): Promise<Metadata> {

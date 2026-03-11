@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { buildApiUrl } from "@/lib/api"
 
 export const metadata = {
   title: "Áreas do Direito | JurisLink",
@@ -8,12 +8,9 @@ export const metadata = {
 }
 
 export default async function AreasPage() {
-  const supabase = await createClient()
-  const { data: areas } = await supabase
-    .from("legal_areas")
-    .select("id, name, slug, description")
-    .eq("is_active", true)
-    .order("name")
+  const response = await fetch(buildApiUrl("/api/public/legal-areas"), { cache: "no-store" })
+  const payload = response.ok ? await response.json() : null
+  const areas = Array.isArray(payload?.areas) ? payload.areas : []
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-10">
