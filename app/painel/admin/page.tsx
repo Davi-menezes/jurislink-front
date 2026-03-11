@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser, getDashboardData } from "@/lib/auth/server"
 import { Users, Scale, AlertTriangle, DollarSign, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,100 +8,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 
 export default async function AdminDashboard() {
-  const supabase = await createClient()
-  
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single()
+  const profile = user.profile as any
 
   if (!profile || profile.role !== "ADMIN") {
     redirect("/")
   }
 
-  // Estatísticas gerais
-  const { count: totalClients } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "CLIENT")
+  const dashboardData = await getDashboardData<{
+    totalClients: number
+    totalLawyers: number
+    pendingVerification: number
+    flaggedReviews: number
+    pendingLawyers: any[]
+    flaggedReviewsData: any[]
+    recentPayments: any[]
+  }>("/api/dashboard/admin")
 
-  const { count: totalLawyers } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "LAWYER")
-
-  const { count: pendingVerification } = await supabase
-    .from("lawyer_profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("verification_status", "PENDING")
-
-  const { count: flaggedReviews } = await supabase
-    .from("reviews")
-    .select("*", { count: "exact", head: true })
-    .eq("is_flagged", true)
-    .eq("is_hidden", false)
-
-  // Advogados pendentes
-  const { data: pendingLawyers } = await supabase
-    .from("lawyer_profiles")
-    .select(`
-      *,
-      profiles:user_id (
-        id,
-        full_name,
-        email,
-        avatar_url,
-        created_at
-      )
-    `)
-    .eq("verification_status", "PENDING")
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  // Avaliações denunciadas
-  const { data: flaggedReviewsData } = await supabase
-    .from("reviews")
-    .select(`
-      *,
-      client:client_id (
-        id,
-        full_name
-      ),
-      lawyer_profile:lawyer_id (
-        id,
-        profiles:user_id (
-          full_name
-        )
-      )
-    `)
-    .eq("is_flagged", true)
-    .eq("is_hidden", false)
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  // Pagamentos recentes
-  const { data: recentPayments } = await supabase
-    .from("payments")
-    .select(`
-      *,
-      lawyer_profile:lawyer_id (
-        id,
-        profiles:user_id (
-          full_name
-        )
-      )
-    `)
-    .order("created_at", { ascending: false })
-    .limit(10)
+  const totalClients = dashboardData?.totalClients || 0
+  const totalLawyers = dashboardData?.totalLawyers || 0
+  const pendingVerification = dashboardData?.pendingVerification || 0
+  const flaggedReviews = dashboardData?.flaggedReviews || 0
+  const pendingLawyers = dashboardData?.pendingLawyers || []
+  const flaggedReviewsData = dashboardData?.flaggedReviewsData || []
+  const recentPayments = dashboardData?.recentPayments || []
 
   return (
     <div className="min-h-screen bg-secondary/30">

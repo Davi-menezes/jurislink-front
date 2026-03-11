@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { authConfig } from "@/lib/auth/config"
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
   const { origin } = new URL(request.url)
-  return NextResponse.redirect(`${origin}/`, { status: 302 })
+  const response = NextResponse.redirect(`${origin}/`, { status: 302 })
+  response.cookies.delete(authConfig.sessionCookieName)
+  return response
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser, getDashboardData } from "@/lib/auth/server"
 import { Heart, MessageSquare, User, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,71 +7,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 
 export default async function ClientDashboard() {
-  const supabase = await createClient()
-  
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single()
+  const profile = user.profile as any
 
   if (!profile || profile.role !== "CLIENT") {
     redirect("/")
   }
 
-  // Buscar favoritos
-  const { data: favorites } = await supabase
-    .from("favorites")
-    .select(`
-      id,
-      created_at,
-      lawyer_profiles:lawyer_id (
-        id,
-        slug,
-        oab_number,
-        oab_state,
-        avg_rating,
-        total_reviews,
-        profiles:user_id (
-          id,
-          full_name,
-          avatar_url,
-          state,
-          city
-        )
-      )
-    `)
-    .eq("client_id", user.id)
-    .order("created_at", { ascending: false })
-
-  // Buscar avaliações do cliente
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select(`
-      id,
-      rating,
-      comment,
-      lawyer_response,
-      created_at,
-      lawyer_profiles:lawyer_id (
-        id,
-        slug,
-        profiles:user_id (
-          full_name,
-          avatar_url
-        )
-      )
-    `)
-    .eq("client_id", user.id)
-    .order("created_at", { ascending: false })
+  const dashboardData = await getDashboardData<{
+    favorites: any[]
+    reviews: any[]
+  }>("/api/dashboard/client")
+  const favorites = dashboardData?.favorites || []
+  const reviews = dashboardData?.reviews || []
 
   return (
     <div className="min-h-screen bg-secondary/30">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser, getDashboardData } from "@/lib/auth/server"
 import { Metadata } from "next"
 import { 
   MapPin, 
@@ -161,19 +162,15 @@ export default async function LawyerPage({ params }: LawyerPageProps) {
     "url": `${process.env.NEXT_PUBLIC_APP_URL}/advogado/${params.slug}`,
   }
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const currentUser = await getCurrentUser()
   
   // Verificar se está favoritado
   let isFavorited = false
-  if (user) {
-    const { data: fav } = await supabase
-      .from("favorites")
-      .select("id")
-      .eq("client_id", user.id)
-      .eq("lawyer_id", lawyer.id)
-      .single()
-    isFavorited = !!fav
+  if (currentUser?.role === "CLIENT") {
+    const favoritesData = await getDashboardData<{ favorites: any[] }>("/api/dashboard/client")
+    isFavorited = Boolean(
+      favoritesData?.favorites?.some((favorite) => favorite.lawyer_profiles?.id === lawyer.id),
+    )
   }
 
   return (
@@ -319,7 +316,7 @@ export default async function LawyerPage({ params }: LawyerPageProps) {
                         {lawyer.total_reviews} {lawyer.total_reviews === 1 ? "avaliação" : "avaliações"}
                       </CardDescription>
                     </div>
-                    {user && (
+                    {currentUser && (
                       <Button asChild variant="outline">
                         <Link href={`/advogado/${params.slug}/avaliar`}>
                           Avaliar

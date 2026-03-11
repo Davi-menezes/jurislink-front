@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 import { Scale, Loader2, User, Briefcase } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,73 +71,34 @@ function SignUpForm() {
     }
 
     setLoading(true)
-    const supabase = createClient()
-
-    // Verificar se o usuário já existe
     const normalizedEmail = email.trim().toLowerCase()
-    const { data: existingUser, error: profileLookupError } = await supabase
-      .from("profiles")
-      .select("id, email_verified")
-      .eq("email", normalizedEmail)
-      .maybeSingle()
-
-    if (profileLookupError) {
-      console.warn("Não foi possível verificar email em profiles:", profileLookupError.message)
-    }
-
-    if (existingUser) {
-      if (!existingUser.email_verified) {
-        await supabase.auth.resend({
-          type: "signup",
-          email: normalizedEmail,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        })
-
-        toast.info("Email de verificação já enviado", {
-          description: "Seu cadastro já existe, mas não foi confirmado. Reenviamos o link de verificação para sua caixa de entrada e spam.",
-        })
-        setLoading(false)
-        return
-      } else {
-        toast.error("Email já cadastrado", {
-          description: "Este email já está em uso. Faça login ou use outro email.",
-        })
-        setLoading(false)
-        return
-      }
-    }
-
-    const { error, data } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: {
-          full_name: fullName,
-          role,
-        },
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        fullName,
+        email: normalizedEmail,
+        password,
+        role,
+        lgpdAccepted,
+      }),
     })
+    const payload = await response.json().catch(() => null)
 
-    if (error) {
+    if (!response.ok) {
       toast.error("Erro ao criar conta", {
-        description: error.message,
+        description: payload?.error || "Não foi possível criar sua conta.",
       })
       setLoading(false)
       return
     }
 
-    // Verificar se precisa confirmar email
-    if (data.user && !data.user.confirmed_at) {
-      toast.success("Conta criada!", {
-        description: "Verifique seu email para ativar sua conta.",
-      })
-      router.push("/auth/cadastro-sucesso")
-    } else {
-      router.push("/auth/callback")
-    }
+    toast.success("Conta criada!", {
+      description: payload?.message || "Verifique seu email para ativar sua conta.",
+    })
+    router.push("/auth/cadastro-sucesso")
   }
 
   async function handleGoogleSignIn() {

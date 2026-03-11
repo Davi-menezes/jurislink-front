@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser, getDashboardData } from "@/lib/auth/server"
 import { Eye, Star, MessageSquare, TrendingUp, CreditCard, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,62 +8,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 
 export default async function LawyerDashboard() {
-  const supabase = await createClient()
-  
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single()
+  const profile = user.profile as any
 
   if (!profile || profile.role !== "LAWYER") {
     redirect("/")
   }
 
-  // Buscar perfil do advogado
-  const { data: lawyerProfile } = await supabase
-    .from("lawyer_profiles")
-    .select(`
-      *,
-      lawyer_legal_areas(legal_areas(id, name, slug, icon))
-    `)
-    .eq("user_id", user.id)
-    .single()
+  const dashboardData = await getDashboardData<{
+    lawyerProfile: any
+    contacts: any[]
+    reviews: any[]
+  }>("/api/dashboard/lawyer")
+  const lawyerProfile = dashboardData?.lawyerProfile
 
   if (!lawyerProfile) {
     redirect("/painel/advogado/perfil")
   }
 
-  // Buscar leads/contatos
-  const { data: contacts } = await supabase
-    .from("contacts")
-    .select("*")
-    .eq("lawyer_id", lawyerProfile.id)
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  // Buscar avaliações
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select(`
-      *,
-      profiles:client_id (
-        id,
-        full_name,
-        avatar_url
-      )
-    `)
-    .eq("lawyer_id", lawyerProfile.id)
-    .eq("is_hidden", false)
-    .order("created_at", { ascending: false })
+  const contacts = dashboardData?.contacts || []
+  const reviews = dashboardData?.reviews || []
 
   const isPremium = lawyerProfile.subscription_status === "ACTIVE"
   const isBoostActive = lawyerProfile.boost_until && new Date(lawyerProfile.boost_until) > new Date()

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,89 +24,30 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const supabase = createClient()
     const normalizedEmail = email.trim().toLowerCase()
-    let emailExists = false
-
-    // Valida o estado do email antes do login quando o schema de profiles estiver disponível.
-    const { data: profileByEmail, error: profileLookupError } = await supabase
-      .from("profiles")
-      .select("id, email_verified")
-      .eq("email", normalizedEmail)
-      .maybeSingle()
-
-    if (!profileLookupError) {
-      if (!profileByEmail) {
-        toast.error("Email não cadastrado", {
-          description: "Esse email não foi cadastrado. Crie sua conta para continuar.",
-        })
-        setLoading(false)
-        return
-      }
-
-      emailExists = true
-
-      if (profileByEmail.email_verified === false) {
-        toast.error("Email não verificado", {
-          description: "Seu email já existe, mas ainda não foi verificado. Verifique sua caixa de entrada e spam.",
-        })
-        setLoading(false)
-        return
-      }
-    } else {
-      console.warn("Não foi possível validar email em profiles:", profileLookupError.message)
-    }
-
-    const { error, data } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: normalizedEmail,
+        password,
+      }),
     })
+    const payload = await response.json().catch(() => null)
 
-    if (error) {
+    if (!response.ok) {
       toast.error("Erro ao entrar", {
-        description: error.message === "Email not confirmed" 
-          ? "Verifique seu email antes de fazer login. Cheque sua caixa de entrada e spam."
-          : error.message === "Invalid login credentials"
-          ? (emailExists ? "Senha incorreta. Tente novamente." : "Esse email não foi cadastrado.")
-          : error.message,
+        description: payload?.error || "Não foi possível entrar na sua conta.",
       })
       setLoading(false)
       return
     }
 
-    // Verificar se o email foi confirmado
-    if (data.user && !data.user.email_confirmed_at) {
-      toast.error("Email não verificado", {
-        description: "Por favor, verifique seu email antes de fazer login. Cheque sua caixa de entrada e spam.",
-      })
-      await supabase.auth.signOut()
-      setLoading(false)
-      return
-    }
-
-    // Buscar perfil e redirecionar
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    
-    if (user) {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      if (profileError) {
-        console.warn("Erro ao carregar role em profiles:", profileError.message)
-      }
-
-      const role = profile?.role || user.user_metadata?.role || "CLIENT"
-      if (role === "LAWYER") router.push("/painel/advogado")
-      else if (role === "ADMIN") router.push("/painel/admin")
-      else router.push("/painel/cliente")
-    }
-
+    router.push(payload?.redirectPath || "/painel/cliente")
     router.refresh()
+    setLoading(false)
   }
 
   return (

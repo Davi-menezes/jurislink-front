@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,16 +17,18 @@ export default function ForgotPasswordPage() {
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-
-    const supabase = createClient()
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    const response = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
     })
+    const payload = await response.json().catch(() => null)
 
-    if (error) {
+    if (!response.ok) {
       toast.error("Erro ao enviar email", {
-        description: error.message,
+        description: payload?.error || "Não foi possível enviar o email.",
       })
       setLoading(false)
       return

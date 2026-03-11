@@ -2,7 +2,36 @@ import Link from "next/link"
 import { Scale, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export default function AuthErrorPage() {
+type AuthErrorPageProps = {
+  searchParams?: Promise<{
+    reason?: string
+    details?: string
+  }>
+}
+
+function getErrorMessage(reason?: string, details?: string) {
+  if (details) {
+    return details
+  }
+
+  if (reason === "access_denied") {
+    return "O Google cancelou ou negou a autenticação."
+  }
+
+  if (reason === "missing_token") {
+    return "O backend não retornou um token de sessão para o frontend."
+  }
+
+  return "Ocorreu um erro durante a autenticacao. O link pode ter expirado ou ja foi utilizado. Tente novamente."
+}
+
+export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
+  const resolvedSearchParams = await searchParams
+  const message = getErrorMessage(
+    resolvedSearchParams?.reason,
+    resolvedSearchParams?.details,
+  )
+
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="mx-auto max-w-md text-center">
@@ -21,8 +50,7 @@ export default function AuthErrorPage() {
           Erro de Autenticacao
         </h1>
         <p className="mt-3 leading-relaxed text-muted-foreground">
-          Ocorreu um erro durante a autenticacao. O link pode ter expirado ou
-          ja foi utilizado. Tente novamente.
+          {message}
         </p>
         <div className="mt-8 flex justify-center gap-3">
           <Button variant="outline" asChild>
